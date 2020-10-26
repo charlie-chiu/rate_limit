@@ -107,7 +107,6 @@ func TestServer(t *testing.T) {
 		}
 
 		time.Sleep(limitPeriod)
-		time.Sleep(100 * time.Millisecond)
 
 		recorder := httptest.NewRecorder()
 		svr.ServeHTTP(recorder, request)

@@ -60,10 +60,15 @@ func (l *limiter) handle(w http.ResponseWriter, r *http.Request) {
 }
 
 func (l *limiter) clearCounter() {
-	for {
-		time.Sleep(l.period)
-		l.mu.Lock()
-		l.callCounter = map[string]int{}
-		l.mu.Unlock()
-	}
+	executeAt := time.Now().Add(l.period).Truncate(l.period)
+	executeAfter := executeAt.Sub(time.Now())
+	time.AfterFunc(executeAfter, func() {
+		for {
+			l.mu.Lock()
+			l.callCounter = map[string]int{}
+			l.mu.Unlock()
+
+			time.Sleep(l.period)
+		}
+	})
 }
