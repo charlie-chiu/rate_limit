@@ -13,13 +13,12 @@ func NewServer() *Server {
 	s := &Server{}
 
 	router := http.NewServeMux()
-	router.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, 1)
-		//w.WriteHeader(http.StatusTooManyRequests)
-	}))
+	router.Handle("/", http.HandlerFunc(handler))
 	s.Handler = router
 
 	return s
 }
 
-
+func handler(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprint(w, 1)
+}

@@ -23,11 +23,15 @@ func TestServer(t *testing.T) {
 		assertResponseCode(t, recorder.Code, http.StatusOK)
 
 		expected := strconv.Itoa(1)
-		got := recorder.Body.String()
-		if got != expected {
-			t.Errorf("expected response body is %q, got %q", expected, got)
-		}
+		assertResponseBody(t, recorder, expected)
 	})
+}
+
+func assertResponseBody(t *testing.T, recorder *httptest.ResponseRecorder, expected string) {
+	got := recorder.Body.String()
+	if got != expected {
+		t.Errorf("expected response body is %q, got %q", expected, got)
+	}
 }
 
 func assertResponseCode(t *testing.T, got, expected int) {
