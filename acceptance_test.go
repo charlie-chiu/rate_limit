@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"strconv"
 	"testing"
+	"time"
 
 	"ratelimit"
 )
@@ -38,6 +39,23 @@ func TestServer(t *testing.T) {
 		svr.ServeHTTP(recorder, request)
 		assertResponseCode(t, recorder.Code, http.StatusTooManyRequests)
 		assertResponseBody(t, recorder, "error")
+	})
+
+	t.Run("API available after limit period", func(t *testing.T) {
+		svr := ratelimit.NewServer()
+		request, _ := http.NewRequest(http.MethodGet, "/", nil)
+
+		for numberOfCalls := 1; numberOfCalls <= ratelimit.Limit; numberOfCalls++ {
+			svr.ServeHTTP(httptest.NewRecorder(), request)
+		}
+
+		const limitPeriod = 1100 * time.Millisecond
+		time.Sleep(limitPeriod)
+
+		recorder := httptest.NewRecorder()
+		svr.ServeHTTP(recorder, request)
+		assertResponseCode(t, recorder.Code, http.StatusOK)
+		assertResponseBody(t, recorder, strconv.Itoa(1))
 	})
 }
 
