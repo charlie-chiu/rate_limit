@@ -1,7 +1,6 @@
 package ratelimit_test
 
 import (
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -11,19 +10,20 @@ import (
 )
 
 func TestServer(t *testing.T) {
+	const maxCalls = 10
+
 	t.Run("get / return number of calls", func(t *testing.T) {
 		svr := ratelimit.NewServer()
 
 		request, _ := http.NewRequest(http.MethodGet, "/", nil)
-		recorder := httptest.NewRecorder()
 
-		log.Println(svr)
-		svr.ServeHTTP(recorder, request)
-
-		assertResponseCode(t, recorder.Code, http.StatusOK)
-
-		expected := strconv.Itoa(1)
-		assertResponseBody(t, recorder, expected)
+		for numberOfCalls := 1; numberOfCalls <= maxCalls; numberOfCalls++ {
+			recorder := httptest.NewRecorder()
+			svr.ServeHTTP(recorder, request)
+			expectedCalls := strconv.Itoa(numberOfCalls)
+			assertResponseCode(t, recorder.Code, http.StatusOK)
+			assertResponseBody(t, recorder, expectedCalls)
+		}
 	})
 }
 

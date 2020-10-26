@@ -11,14 +11,21 @@ type Server struct {
 
 func NewServer() *Server {
 	s := &Server{}
+	l := &limiter{}
 
 	router := http.NewServeMux()
-	router.Handle("/", http.HandlerFunc(handler))
+	router.Handle("/", http.HandlerFunc(l.handle))
 	s.Handler = router
 
 	return s
 }
 
-func handler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprint(w, 1)
+type limiter struct {
+	callCounter int
+}
+
+func (l *limiter) handle(w http.ResponseWriter, r *http.Request) {
+	l.callCounter++
+
+	_, _ = fmt.Fprint(w, l.callCounter)
 }
