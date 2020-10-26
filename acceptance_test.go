@@ -12,16 +12,16 @@ import (
 
 func TestServer(t *testing.T) {
 	t.Run("get / return number of calls", func(t *testing.T) {
-		maxCalls := 10
+		maxRequests := 10
 		limit := ratelimit.Limit{
-			Count:  maxCalls,
-			Within: time.Second,
+			Requests: maxRequests,
+			Within:   time.Second,
 		}
 		svr := ratelimit.NewServer(limit)
 
 		request, _ := http.NewRequest(http.MethodGet, "/", nil)
 
-		for numberOfCalls := 1; numberOfCalls <= maxCalls; numberOfCalls++ {
+		for numberOfCalls := 1; numberOfCalls <= maxRequests; numberOfCalls++ {
 			recorder := httptest.NewRecorder()
 			svr.ServeHTTP(recorder, request)
 			expectedCalls := strconv.Itoa(numberOfCalls)
@@ -33,8 +33,8 @@ func TestServer(t *testing.T) {
 	t.Run("get / return error with 429 when Limit exceeded", func(t *testing.T) {
 		const limitCalls = 10
 		limit := ratelimit.Limit{
-			Count:  limitCalls,
-			Within: time.Second,
+			Requests: limitCalls,
+			Within:   time.Second,
 		}
 		svr := ratelimit.NewServer(limit)
 
@@ -56,16 +56,16 @@ func TestServer(t *testing.T) {
 		const clientIP2 = "IP2"
 		const clientIP3 = "IP3"
 
-		maxCalls := 10
+		maxRequests := 10
 		limit := ratelimit.Limit{
-			Count:  maxCalls,
-			Within: time.Second,
+			Requests: maxRequests,
+			Within:   time.Second,
 		}
 		svr := ratelimit.NewServer(limit)
 
 		request, _ := http.NewRequest(http.MethodGet, "/", nil)
 		request.RemoteAddr = clientIP1
-		for numberOfCalls := 1; numberOfCalls <= maxCalls; numberOfCalls++ {
+		for numberOfCalls := 1; numberOfCalls <= maxRequests; numberOfCalls++ {
 			recorder := httptest.NewRecorder()
 			svr.ServeHTTP(recorder, request)
 			expectedCalls := strconv.Itoa(numberOfCalls)
@@ -74,7 +74,7 @@ func TestServer(t *testing.T) {
 		}
 
 		request.RemoteAddr = clientIP2
-		for numberOfCalls := 1; numberOfCalls <= maxCalls; numberOfCalls++ {
+		for numberOfCalls := 1; numberOfCalls <= maxRequests; numberOfCalls++ {
 			recorder := httptest.NewRecorder()
 			svr.ServeHTTP(recorder, request)
 			expectedCalls := strconv.Itoa(numberOfCalls)
@@ -83,7 +83,7 @@ func TestServer(t *testing.T) {
 		}
 
 		request.RemoteAddr = clientIP3
-		for numberOfCalls := 1; numberOfCalls <= maxCalls; numberOfCalls++ {
+		for numberOfCalls := 1; numberOfCalls <= maxRequests; numberOfCalls++ {
 			recorder := httptest.NewRecorder()
 			svr.ServeHTTP(recorder, request)
 			expectedCalls := strconv.Itoa(numberOfCalls)
@@ -93,19 +93,20 @@ func TestServer(t *testing.T) {
 	})
 
 	t.Run("API available after limit period", func(t *testing.T) {
-		const limitCalls = 10
+		const maxRequests = 10
 		const limitPeriod = 500 * time.Millisecond
 		limit := ratelimit.Limit{
-			Count:  limitCalls,
-			Within: limitPeriod,
+			Requests: maxRequests,
+			Within:   limitPeriod,
 		}
 		svr := ratelimit.NewServer(limit)
 		request, _ := http.NewRequest(http.MethodGet, "/", nil)
 
-		for numberOfCalls := 1; numberOfCalls <= limitCalls; numberOfCalls++ {
+		for numberOfCalls := 1; numberOfCalls <= maxRequests; numberOfCalls++ {
 			svr.ServeHTTP(httptest.NewRecorder(), request)
 		}
 
+		// wait for reset
 		time.Sleep(limitPeriod)
 
 		recorder := httptest.NewRecorder()

@@ -11,24 +11,24 @@ type Server struct {
 	http.Handler
 }
 
-func NewServer(l Limit) *Server {
+func NewServer(limit Limit) *Server {
 	s := &Server{}
-	limiter := newLimiter(l)
+	l := newLimiter(limit)
 
 	router := http.NewServeMux()
-	router.Handle("/", http.HandlerFunc(limiter.handle))
+	router.Handle("/", http.HandlerFunc(l.handle))
 	s.Handler = router
 
 	return s
 }
 
 type Limit struct {
-	Count  int
-	Within time.Duration
+	Requests int
+	Within   time.Duration
 }
 
 type limiter struct {
-	calls       int
+	requests    int
 	period      time.Duration
 	callCounter map[string]int
 	mu          sync.Mutex
@@ -36,11 +36,11 @@ type limiter struct {
 
 func newLimiter(limit Limit) *limiter {
 	l := &limiter{
-		calls:       limit.Count,
+		requests:    limit.Requests,
 		period:      limit.Within,
 		callCounter: make(map[string]int),
 	}
-	go l.clearCounter()
+	go l.resetPeriodically()
 	return l
 }
 
@@ -50,7 +50,7 @@ func (l *limiter) handle(w http.ResponseWriter, r *http.Request) {
 	l.callCounter[r.RemoteAddr]++
 	numberOfCalls := l.callCounter[r.RemoteAddr]
 
-	if numberOfCalls > l.calls {
+	if numberOfCalls > l.requests {
 		w.WriteHeader(http.StatusTooManyRequests)
 		_, _ = fmt.Fprint(w, "error")
 	} else {
@@ -59,7 +59,7 @@ func (l *limiter) handle(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (l *limiter) clearCounter() {
+func (l *limiter) resetPeriodically() {
 	executeAt := time.Now().Add(l.period).Truncate(l.period)
 	executeAfter := executeAt.Sub(time.Now())
 	time.AfterFunc(executeAfter, func() {

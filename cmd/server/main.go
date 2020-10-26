@@ -11,8 +11,8 @@ import (
 func main() {
 	const addr = ":80"
 	limit := ratelimit.Limit{
-		Count:  60,
-		Within: 60 * time.Second,
+		Requests: 60,
+		Within:   60 * time.Second,
 	}
 	s := ratelimit.NewServer(limit)
 
