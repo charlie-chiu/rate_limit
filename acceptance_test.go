@@ -15,17 +15,6 @@ func TestServer(t *testing.T) {
 
 		request, _ := http.NewRequest(http.MethodGet, "/", nil)
 
-		recorder := httptest.NewRecorder()
-		svr.ServeHTTP(recorder, request)
-		assertResponseCode(t, recorder.Code, http.StatusOK)
-		assertResponseBody(t, recorder, strconv.Itoa(1))
-	})
-
-	t.Run("get / return error with 429 when Limit exceeded", func(t *testing.T) {
-		svr := ratelimit.NewServer()
-
-		request, _ := http.NewRequest(http.MethodGet, "/", nil)
-
 		for numberOfCalls := 1; numberOfCalls <= ratelimit.Limit; numberOfCalls++ {
 			recorder := httptest.NewRecorder()
 			svr.ServeHTTP(recorder, request)
@@ -33,8 +22,19 @@ func TestServer(t *testing.T) {
 			assertResponseCode(t, recorder.Code, http.StatusOK)
 			assertResponseBody(t, recorder, expectedCalls)
 		}
+	})
+
+	t.Run("get / return error with 429 when Limit exceeded", func(t *testing.T) {
+		svr := ratelimit.NewServer()
+
+		request, _ := http.NewRequest(http.MethodGet, "/", nil)
 
 		recorder := httptest.NewRecorder()
+		for numberOfCalls := 1; numberOfCalls <= ratelimit.Limit; numberOfCalls++ {
+			svr.ServeHTTP(recorder, request)
+		}
+
+		recorder = httptest.NewRecorder()
 		svr.ServeHTTP(recorder, request)
 		assertResponseCode(t, recorder.Code, http.StatusTooManyRequests)
 		assertResponseBody(t, recorder, "error")
