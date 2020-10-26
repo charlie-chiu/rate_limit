@@ -10,20 +10,34 @@ import (
 )
 
 func TestServer(t *testing.T) {
-	const maxCalls = 10
-
 	t.Run("get / return number of calls", func(t *testing.T) {
 		svr := ratelimit.NewServer()
 
 		request, _ := http.NewRequest(http.MethodGet, "/", nil)
 
-		for numberOfCalls := 1; numberOfCalls <= maxCalls; numberOfCalls++ {
+		recorder := httptest.NewRecorder()
+		svr.ServeHTTP(recorder, request)
+		assertResponseCode(t, recorder.Code, http.StatusOK)
+		assertResponseBody(t, recorder, strconv.Itoa(1))
+	})
+
+	t.Run("get / return error with 429 when Limit exceeded", func(t *testing.T) {
+		svr := ratelimit.NewServer()
+
+		request, _ := http.NewRequest(http.MethodGet, "/", nil)
+
+		for numberOfCalls := 1; numberOfCalls <= ratelimit.Limit; numberOfCalls++ {
 			recorder := httptest.NewRecorder()
 			svr.ServeHTTP(recorder, request)
 			expectedCalls := strconv.Itoa(numberOfCalls)
 			assertResponseCode(t, recorder.Code, http.StatusOK)
 			assertResponseBody(t, recorder, expectedCalls)
 		}
+
+		recorder := httptest.NewRecorder()
+		svr.ServeHTTP(recorder, request)
+		assertResponseCode(t, recorder.Code, http.StatusTooManyRequests)
+		assertResponseBody(t, recorder, "error")
 	})
 }
 

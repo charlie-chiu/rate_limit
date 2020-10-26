@@ -11,7 +11,9 @@ type Server struct {
 
 func NewServer() *Server {
 	s := &Server{}
-	l := &limiter{}
+	l := &limiter{
+		callCounter: make(map[string]int),
+	}
 
 	router := http.NewServeMux()
 	router.Handle("/", http.HandlerFunc(l.handle))
@@ -20,12 +22,22 @@ func NewServer() *Server {
 	return s
 }
 
+const Limit = 60
+
 type limiter struct {
-	callCounter int
+	callCounter map[string]int
 }
 
 func (l *limiter) handle(w http.ResponseWriter, r *http.Request) {
-	l.callCounter++
+	l.callCounter[r.RemoteAddr]++
+	numberOfCalls := l.callCounter[r.RemoteAddr]
 
-	_, _ = fmt.Fprint(w, l.callCounter)
+	if numberOfCalls > Limit {
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = fmt.Fprint(w, "error")
+	} else {
+		w.WriteHeader(http.StatusOK)
+		_, _ = fmt.Fprint(w, numberOfCalls)
+	}
+
 }
