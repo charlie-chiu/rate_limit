@@ -51,6 +51,47 @@ func TestServer(t *testing.T) {
 		assertResponseBody(t, recorder, "error")
 	})
 
+	t.Run("different IP with separate limit", func(t *testing.T) {
+		const clientIP1 = "IP1"
+		const clientIP2 = "IP2"
+		const clientIP3 = "IP3"
+
+		maxCalls := 10
+		limit := ratelimit.Limit{
+			Count:  maxCalls,
+			Within: time.Second,
+		}
+		svr := ratelimit.NewServer(limit)
+
+		request, _ := http.NewRequest(http.MethodGet, "/", nil)
+		request.RemoteAddr = clientIP1
+		for numberOfCalls := 1; numberOfCalls <= maxCalls; numberOfCalls++ {
+			recorder := httptest.NewRecorder()
+			svr.ServeHTTP(recorder, request)
+			expectedCalls := strconv.Itoa(numberOfCalls)
+			assertResponseCode(t, recorder.Code, http.StatusOK)
+			assertResponseBody(t, recorder, expectedCalls)
+		}
+
+		request.RemoteAddr = clientIP2
+		for numberOfCalls := 1; numberOfCalls <= maxCalls; numberOfCalls++ {
+			recorder := httptest.NewRecorder()
+			svr.ServeHTTP(recorder, request)
+			expectedCalls := strconv.Itoa(numberOfCalls)
+			assertResponseCode(t, recorder.Code, http.StatusOK)
+			assertResponseBody(t, recorder, expectedCalls)
+		}
+
+		request.RemoteAddr = clientIP3
+		for numberOfCalls := 1; numberOfCalls <= maxCalls; numberOfCalls++ {
+			recorder := httptest.NewRecorder()
+			svr.ServeHTTP(recorder, request)
+			expectedCalls := strconv.Itoa(numberOfCalls)
+			assertResponseCode(t, recorder.Code, http.StatusOK)
+			assertResponseBody(t, recorder, expectedCalls)
+		}
+	})
+
 	t.Run("API available after limit period", func(t *testing.T) {
 		const limitCalls = 10
 		const limitPeriod = 500 * time.Millisecond
