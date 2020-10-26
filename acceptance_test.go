@@ -12,11 +12,16 @@ import (
 
 func TestServer(t *testing.T) {
 	t.Run("get / return number of calls", func(t *testing.T) {
-		svr := ratelimit.NewServer()
+		maxCalls := 10
+		limit := ratelimit.Limit{
+			Count:  maxCalls,
+			Within: time.Second,
+		}
+		svr := ratelimit.NewServer(limit)
 
 		request, _ := http.NewRequest(http.MethodGet, "/", nil)
 
-		for numberOfCalls := 1; numberOfCalls <= ratelimit.Limit; numberOfCalls++ {
+		for numberOfCalls := 1; numberOfCalls <= maxCalls; numberOfCalls++ {
 			recorder := httptest.NewRecorder()
 			svr.ServeHTTP(recorder, request)
 			expectedCalls := strconv.Itoa(numberOfCalls)
@@ -26,12 +31,17 @@ func TestServer(t *testing.T) {
 	})
 
 	t.Run("get / return error with 429 when Limit exceeded", func(t *testing.T) {
-		svr := ratelimit.NewServer()
+		const limitCalls = 10
+		limit := ratelimit.Limit{
+			Count:  limitCalls,
+			Within: time.Second,
+		}
+		svr := ratelimit.NewServer(limit)
 
 		request, _ := http.NewRequest(http.MethodGet, "/", nil)
 
 		recorder := httptest.NewRecorder()
-		for numberOfCalls := 1; numberOfCalls <= ratelimit.Limit; numberOfCalls++ {
+		for numberOfCalls := 1; numberOfCalls <= limitCalls; numberOfCalls++ {
 			svr.ServeHTTP(recorder, request)
 		}
 
@@ -42,15 +52,21 @@ func TestServer(t *testing.T) {
 	})
 
 	t.Run("API available after limit period", func(t *testing.T) {
-		svr := ratelimit.NewServer()
+		const limitCalls = 10
+		const limitPeriod = 500 * time.Millisecond
+		limit := ratelimit.Limit{
+			Count:  limitCalls,
+			Within: limitPeriod,
+		}
+		svr := ratelimit.NewServer(limit)
 		request, _ := http.NewRequest(http.MethodGet, "/", nil)
 
-		for numberOfCalls := 1; numberOfCalls <= ratelimit.Limit; numberOfCalls++ {
+		for numberOfCalls := 1; numberOfCalls <= limitCalls; numberOfCalls++ {
 			svr.ServeHTTP(httptest.NewRecorder(), request)
 		}
 
-		const limitPeriod = 1100 * time.Millisecond
 		time.Sleep(limitPeriod)
+		time.Sleep(100 * time.Millisecond)
 
 		recorder := httptest.NewRecorder()
 		svr.ServeHTTP(recorder, request)

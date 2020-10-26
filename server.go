@@ -11,26 +11,33 @@ type Server struct {
 	http.Handler
 }
 
-func NewServer() *Server {
+func NewServer(l Limit) *Server {
 	s := &Server{}
-	l := newLimiter()
+	limiter := newLimiter(l)
 
 	router := http.NewServeMux()
-	router.Handle("/", http.HandlerFunc(l.handle))
+	router.Handle("/", http.HandlerFunc(limiter.handle))
 	s.Handler = router
 
 	return s
 }
 
-const Limit = 60
+type Limit struct {
+	Count  int
+	Within time.Duration
+}
 
 type limiter struct {
+	calls       int
+	period      time.Duration
 	callCounter map[string]int
 	mu          sync.Mutex
 }
 
-func newLimiter() *limiter {
+func newLimiter(limit Limit) *limiter {
 	l := &limiter{
+		calls:       limit.Count,
+		period:      limit.Within,
 		callCounter: make(map[string]int),
 	}
 	go l.clearCounter()
@@ -43,7 +50,7 @@ func (l *limiter) handle(w http.ResponseWriter, r *http.Request) {
 	l.callCounter[r.RemoteAddr]++
 	numberOfCalls := l.callCounter[r.RemoteAddr]
 
-	if numberOfCalls > Limit {
+	if numberOfCalls > l.calls {
 		w.WriteHeader(http.StatusTooManyRequests)
 		_, _ = fmt.Fprint(w, "error")
 	} else {
@@ -54,7 +61,7 @@ func (l *limiter) handle(w http.ResponseWriter, r *http.Request) {
 
 func (l *limiter) clearCounter() {
 	for {
-		time.Sleep(time.Second)
+		time.Sleep(l.period)
 		l.mu.Lock()
 		l.callCounter = map[string]int{}
 		l.mu.Unlock()
