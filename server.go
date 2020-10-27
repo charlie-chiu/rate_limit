@@ -45,17 +45,27 @@ func newLimiter(limit Limit) *limiter {
 }
 
 func (l *limiter) handle(w http.ResponseWriter, r *http.Request) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	l.callCounter[r.RemoteAddr]++
-	numberOfCalls := l.callCounter[r.RemoteAddr]
+	numberOfCalls, shouldHandle := l.shouldHandle(r)
 
-	if numberOfCalls > l.requests {
-		w.WriteHeader(http.StatusTooManyRequests)
-		_, _ = fmt.Fprint(w, "error")
-	} else {
+	if shouldHandle {
 		w.WriteHeader(http.StatusOK)
 		_, _ = fmt.Fprint(w, numberOfCalls)
+	} else {
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = fmt.Fprint(w, "error")
+	}
+}
+
+func (l *limiter) shouldHandle(r *http.Request) (numberOfRequest int, shouldHandle bool) {
+	l.mu.Lock()
+	l.callCounter[r.RemoteAddr]++
+	numberOfCalls := l.callCounter[r.RemoteAddr]
+	l.mu.Unlock()
+
+	if numberOfCalls > l.requests {
+		return numberOfCalls, false
+	} else {
+		return numberOfCalls, true
 	}
 }
 
