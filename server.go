@@ -28,53 +28,53 @@ type Limit struct {
 }
 
 type limiter struct {
-	requests    int
-	period      time.Duration
-	callCounter map[string]map[int64]int
-	mu          sync.Mutex
+	requests   int
+	period     time.Duration
+	reqCounter map[string]map[int64]int
+	mu         sync.Mutex
 }
 
 func newLimiter(limit Limit) *limiter {
 	l := &limiter{
-		requests:    limit.Requests,
-		period:      limit.Within,
-		callCounter: make(map[string]map[int64]int),
+		requests:   limit.Requests,
+		period:     limit.Within,
+		reqCounter: make(map[string]map[int64]int),
 	}
 	return l
 }
 
 func (l *limiter) handle(w http.ResponseWriter, r *http.Request) {
-	numberOfCalls, shouldHandle := l.shouldHandle(r)
+	shouldHandle, numberOfReq := l.shouldHandle(r)
 
 	if shouldHandle {
 		w.WriteHeader(http.StatusOK)
-		_, _ = fmt.Fprint(w, numberOfCalls)
+		_, _ = fmt.Fprint(w, numberOfReq)
 	} else {
 		w.WriteHeader(http.StatusTooManyRequests)
 		_, _ = fmt.Fprint(w, "error")
 	}
 }
 
-func (l *limiter) shouldHandle(r *http.Request) (numberOfRequest int, shouldHandle bool) {
+func (l *limiter) shouldHandle(r *http.Request) (shouldHandle bool, numberOfReq int) {
 	// increase request count
 	now := time.Now().Unix()
 
 	// first request from this addr
-	if _, ok := l.callCounter[r.RemoteAddr]; !ok {
-		l.callCounter[r.RemoteAddr] = map[int64]int{now: 1}
-		return 1, true
+	if _, ok := l.reqCounter[r.RemoteAddr]; !ok {
+		l.reqCounter[r.RemoteAddr] = map[int64]int{now: 1}
+		return true, 1
 	}
 
-	l.callCounter[r.RemoteAddr][now]++
+	l.reqCounter[r.RemoteAddr][now]++
 	// sum reqs in window
 	windowStart := time.Now().Add(l.period*-1).Unix() + 1
 	for s := windowStart; s <= now; s++ {
-		numberOfRequest += l.callCounter[r.RemoteAddr][s]
+		numberOfReq += l.reqCounter[r.RemoteAddr][s]
 
-		if numberOfRequest > l.requests {
-			return 0, false
+		if numberOfReq > l.requests {
+			return false, 0
 		}
 	}
 
-	return numberOfRequest, true
+	return true, numberOfReq
 }
