@@ -44,18 +44,18 @@ func newLimiter(limit Limit) *limiter {
 }
 
 func (l *limiter) handle(w http.ResponseWriter, r *http.Request) {
-	shouldHandle, numberOfReq := l.shouldHandle(r)
+	shouldHandle, numberOfReqs := l.shouldHandle(r)
 
 	if shouldHandle {
 		w.WriteHeader(http.StatusOK)
-		_, _ = fmt.Fprint(w, numberOfReq)
+		_, _ = fmt.Fprint(w, numberOfReqs)
 	} else {
 		w.WriteHeader(http.StatusTooManyRequests)
 		_, _ = fmt.Fprint(w, "error")
 	}
 }
 
-func (l *limiter) shouldHandle(r *http.Request) (shouldHandle bool, numberOfReq int) {
+func (l *limiter) shouldHandle(r *http.Request) (shouldHandle bool, numberOfReqs int) {
 	// increase request count
 	now := time.Now().Unix()
 
@@ -69,12 +69,12 @@ func (l *limiter) shouldHandle(r *http.Request) (shouldHandle bool, numberOfReq 
 	// sum reqs in window
 	windowStart := time.Now().Add(l.period*-1).Unix() + 1
 	for s := windowStart; s <= now; s++ {
-		numberOfReq += l.reqCounter[r.RemoteAddr][s]
+		numberOfReqs += l.reqCounter[r.RemoteAddr][s]
 
-		if numberOfReq > l.requests {
+		if numberOfReqs > l.requests {
 			return false, 0
 		}
 	}
 
-	return true, numberOfReq
+	return true, numberOfReqs
 }
