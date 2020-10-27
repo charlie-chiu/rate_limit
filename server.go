@@ -56,16 +56,16 @@ func (l *limiter) handle(w http.ResponseWriter, r *http.Request) {
 }
 
 func (l *limiter) shouldHandle(r *http.Request) (numberOfRequest int, shouldHandle bool) {
-	// first request from this addr
-	if _, ok := l.callCounter[r.RemoteAddr]; !ok {
-		l.callCounter[r.RemoteAddr] = make(map[int64]int)
-		// no previous request, can we just return 1, ture ?
-	}
-
 	// increase request count
 	now := time.Now().Unix()
-	l.callCounter[r.RemoteAddr][now]++
 
+	// first request from this addr
+	if _, ok := l.callCounter[r.RemoteAddr]; !ok {
+		l.callCounter[r.RemoteAddr] = map[int64]int{now: 1}
+		return 1, true
+	}
+
+	l.callCounter[r.RemoteAddr][now]++
 	// sum reqs in window
 	windowStart := time.Now().Add(l.period*-1).Unix() + 1
 	for s := windowStart; s <= now; s++ {
