@@ -59,6 +59,8 @@ func (l *limiter) shouldHandle(r *http.Request) (shouldHandle bool, numberOfReqs
 	// increase request count
 	now := time.Now().Unix()
 
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	// first request from this addr
 	if _, ok := l.reqCounter[r.RemoteAddr]; !ok {
 		l.reqCounter[r.RemoteAddr] = map[int64]int{now: 1}

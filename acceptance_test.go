@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -48,6 +49,31 @@ func TestLimiter(t *testing.T) {
 		assertResponseOK(t, svr, maxRequests, "addr1")
 		assertResponseOK(t, svr, maxRequests, "addr2")
 		assertResponseOK(t, svr, maxRequests, "addr3")
+	})
+
+	t.Run("handle race condition", func(t *testing.T) {
+		const numOfRequests = 100
+		limit := ratelimit.Limit{
+			Requests: numOfRequests,
+			Within:   time.Second,
+		}
+		svr := ratelimit.NewServer(limit)
+		wg := sync.WaitGroup{}
+		wg.Add(numOfRequests)
+
+		request, _ := http.NewRequest(http.MethodGet, "/", nil)
+		request.RemoteAddr = dummyAddr
+		for i := 1; i <= numOfRequests; i++ {
+			go func() {
+				recorder := httptest.NewRecorder()
+				svr.ServeHTTP(recorder, request)
+				assertResponseCode(t, recorder.Code, http.StatusOK)
+				wg.Done()
+			}()
+		}
+		wg.Wait()
+
+		assertTooManyRequest(t, svr, dummyAddr)
 	})
 }
 
