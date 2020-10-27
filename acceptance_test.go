@@ -11,39 +11,33 @@ import (
 )
 
 func TestLimiter(t *testing.T) {
-	t.Run("get / return number of calls", func(t *testing.T) {
-		maxRequests := 10
+	const dummyAddr = "dummyAddr"
+	t.Run("whole process", func(t *testing.T) {
+		// 200 ok, 429 too many req, wait, then 200 again
+		const numOfRequests = 10
+		const period = 2 * time.Second
 		limit := ratelimit.Limit{
-			Requests: maxRequests,
-			Within:   time.Second,
+			Requests: numOfRequests,
+			Within:   period,
 		}
 		svr := ratelimit.NewServer(limit)
 
-		assertResponseOK(t, svr, maxRequests, "dummyAddr")
-	})
+		// 200 ok
+		assertResponseOK(t, svr, numOfRequests, dummyAddr)
 
-	t.Run("return code 429 when Limit exceeded", func(t *testing.T) {
-		const limitCalls = 4
-		const limitWindow = 2 * time.Second
-		limit := ratelimit.Limit{
-			Requests: limitCalls,
-			Within:   limitWindow,
-		}
-		svr := ratelimit.NewServer(limit)
+		// hitting limit, 429 too many req
+		assertTooManyRequest(t, svr, dummyAddr)
 
-		assertResponseOK(t, svr, limitCalls, "dummyAddr")
-		// sampling period is second
-		time.Sleep(1200 * time.Millisecond)
+		// within period, still 429 too many req
+		time.Sleep(period / 2)
+		assertTooManyRequest(t, svr, dummyAddr)
 
-		recorder := httptest.NewRecorder()
-		request, _ := http.NewRequest(http.MethodGet, "/", nil)
-		svr.ServeHTTP(recorder, request)
-		assertResponseCode(t, recorder.Code, http.StatusTooManyRequests)
-		assertResponseBody(t, recorder, "error")
+		// after period, 200 ok again
+		time.Sleep(period)
+		assertResponseOK(t, svr, numOfRequests, dummyAddr)
 	})
 
 	t.Run("different IP with separate limit", func(t *testing.T) {
-
 		maxRequests := 10
 		limit := ratelimit.Limit{
 			Requests: maxRequests,
@@ -54,28 +48,6 @@ func TestLimiter(t *testing.T) {
 		assertResponseOK(t, svr, maxRequests, "addr1")
 		assertResponseOK(t, svr, maxRequests, "addr2")
 		assertResponseOK(t, svr, maxRequests, "addr3")
-	})
-
-	t.Run("API available after limit period", func(t *testing.T) {
-		const maxRequests = 10
-		const limitPeriod = time.Second
-		limit := ratelimit.Limit{
-			Requests: maxRequests,
-			Within:   limitPeriod,
-		}
-		svr := ratelimit.NewServer(limit)
-
-		assertResponseOK(t, svr, maxRequests, "dummyAddr")
-
-		request, _ := http.NewRequest(http.MethodGet, "/", nil)
-
-		// wait for reset
-		time.Sleep(limitPeriod)
-
-		recorder := httptest.NewRecorder()
-		svr.ServeHTTP(recorder, request)
-		assertResponseCode(t, recorder.Code, http.StatusOK)
-		assertResponseBody(t, recorder, strconv.Itoa(1))
 	})
 }
 
@@ -89,6 +61,16 @@ func assertResponseOK(t *testing.T, svr *ratelimit.Server, requests int, clientA
 		assertResponseCode(t, recorder.Code, http.StatusOK)
 		assertResponseBody(t, recorder, strconv.Itoa(numberOfRequests))
 	}
+}
+
+func assertTooManyRequest(t *testing.T, svr *ratelimit.Server, clientAddr string) {
+	t.Helper()
+	recorder := httptest.NewRecorder()
+	request, _ := http.NewRequest(http.MethodGet, "/", nil)
+	request.RemoteAddr = clientAddr
+	svr.ServeHTTP(recorder, request)
+	assertResponseCode(t, recorder.Code, http.StatusTooManyRequests)
+	assertResponseBody(t, recorder, "error")
 }
 
 func assertResponseBody(t *testing.T, recorder *httptest.ResponseRecorder, expected string) {
