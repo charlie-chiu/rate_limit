@@ -30,22 +30,22 @@ func TestServer(t *testing.T) {
 		}
 	})
 
-	t.Run("get / return error with 429 when Limit exceeded", func(t *testing.T) {
-		const limitCalls = 10
+	t.Run("return code 429 when Limit exceeded", func(t *testing.T) {
+		const limitCalls = 4
+		const limitWindow = 2 * time.Second
 		limit := ratelimit.Limit{
 			Requests: limitCalls,
-			Within:   time.Second,
+			Within:   limitWindow,
 		}
 		svr := ratelimit.NewServer(limit)
-
 		request, _ := http.NewRequest(http.MethodGet, "/", nil)
+		for numberOfCalls := 1; numberOfCalls <= limitCalls; numberOfCalls++ {
+			svr.ServeHTTP(httptest.NewRecorder(), request)
+		}
+		// sampling period is second
+		time.Sleep(1200 * time.Millisecond)
 
 		recorder := httptest.NewRecorder()
-		for numberOfCalls := 1; numberOfCalls <= limitCalls; numberOfCalls++ {
-			svr.ServeHTTP(recorder, request)
-		}
-
-		recorder = httptest.NewRecorder()
 		svr.ServeHTTP(recorder, request)
 		assertResponseCode(t, recorder.Code, http.StatusTooManyRequests)
 		assertResponseBody(t, recorder, "error")
@@ -94,7 +94,7 @@ func TestServer(t *testing.T) {
 
 	t.Run("API available after limit period", func(t *testing.T) {
 		const maxRequests = 10
-		const limitPeriod = 500 * time.Millisecond
+		const limitPeriod = time.Second
 		limit := ratelimit.Limit{
 			Requests: maxRequests,
 			Within:   limitPeriod,
@@ -117,6 +117,7 @@ func TestServer(t *testing.T) {
 }
 
 func assertResponseBody(t *testing.T, recorder *httptest.ResponseRecorder, expected string) {
+	t.Helper()
 	got := recorder.Body.String()
 	if got != expected {
 		t.Errorf("expected response body is %q, got %q", expected, got)
@@ -126,6 +127,6 @@ func assertResponseBody(t *testing.T, recorder *httptest.ResponseRecorder, expec
 func assertResponseCode(t *testing.T, got, expected int) {
 	t.Helper()
 	if got != expected {
-		t.Errorf("expect response status code %d, got %d", expected, got)
+		t.Errorf("expected response status code %d, got %d", expected, got)
 	}
 }
