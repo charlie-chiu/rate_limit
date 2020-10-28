@@ -56,22 +56,24 @@ func (l *limiter) handle(w http.ResponseWriter, r *http.Request) {
 }
 
 func (l *limiter) shouldHandle(r *http.Request) (shouldHandle bool, numberOfReqs int) {
+	userIP := readUserIP(r)
+
 	// increase request count
 	now := time.Now().Unix()
 
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	// first request from this addr
-	if _, ok := l.reqCounter[r.RemoteAddr]; !ok {
-		l.reqCounter[r.RemoteAddr] = map[int64]int{now: 1}
+	if _, ok := l.reqCounter[userIP]; !ok {
+		l.reqCounter[userIP] = map[int64]int{now: 1}
 		return true, 1
 	}
 
-	l.reqCounter[r.RemoteAddr][now]++
+	l.reqCounter[userIP][now]++
 	// sum reqs in window
 	windowStart := time.Now().Add(l.period*-1).Unix() + 1
 	for s := windowStart; s <= now; s++ {
-		numberOfReqs += l.reqCounter[r.RemoteAddr][s]
+		numberOfReqs += l.reqCounter[userIP][s]
 
 		if numberOfReqs > l.requests {
 			return false, 0
@@ -79,4 +81,15 @@ func (l *limiter) shouldHandle(r *http.Request) (shouldHandle bool, numberOfReqs
 	}
 
 	return true, numberOfReqs
+}
+
+func readUserIP(r *http.Request) string {
+	IPAddress := r.Header.Get("X-Real-Ip")
+	if IPAddress == "" {
+		IPAddress = r.Header.Get("X-Forwarded-For")
+	}
+	if IPAddress == "" {
+		IPAddress = r.RemoteAddr
+	}
+	return IPAddress
 }

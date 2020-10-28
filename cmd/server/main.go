@@ -3,18 +3,24 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"ratelimit"
 )
 
 func main() {
-	const addr = ":80"
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "80"
+		log.Printf("Defaulting to port %s", port)
+	}
+
 	limit := ratelimit.Limit{
-		Requests: 60,
-		Within:   60 * time.Second,
+		Requests: 5,
+		Within:   5 * time.Second,
 	}
 	s := ratelimit.NewServer(limit)
 
-	log.Fatal(http.ListenAndServe(addr, s))
+	log.Fatal(http.ListenAndServe(":"+port, s))
 }
